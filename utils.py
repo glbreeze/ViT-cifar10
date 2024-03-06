@@ -8,10 +8,102 @@
 import os
 import sys
 import time
-import math
+import torch
 
 import torch.nn as nn
+import torch.optim as optim
 import torch.nn.init as init
+
+
+def _get_polynomial_decay(lr, end_lr, decay_epochs, from_epoch=0, power=1.0):
+  # Note: epochs are zero indexed by pytorch
+  end_epoch = float(from_epoch + decay_epochs)
+
+  def lr_lambda(epoch):
+    if epoch < from_epoch:
+      return 1.0
+    epoch = min(epoch, end_epoch)
+    new_lr = ((lr - end_lr) * (1. - epoch / end_epoch) ** power + end_lr)
+    return new_lr / lr  # LambdaLR expects returning a factor
+
+  return lr_lambda
+
+
+def get_scheduler(args, optimizer):
+    """
+    cosine will change learning rate every iteration, others change learning rate every epoch
+    :param batches: the number of iterations in each epochs
+    :return: scheduler
+    """
+
+    lr_lambda = _get_polynomial_decay(args.lr, args.end_lr,
+                                      decay_epochs=args.decay_epochs,
+                                      from_epoch=0, power=args.power)
+    SCHEDULERS = {
+        'step': optim.lr_scheduler.StepLR(optimizer, step_size=args.max_epochs//10, gamma=args.lr_decay),
+        'multi_step': optim.lr_scheduler.MultiStepLR(optimizer, milestones=[150,350], gamma=0.1),
+        'cosine': optim.lr_scheduler.CosineAnnealingLR(optimizer, args.max_epochs),
+        'poly': optim.lr_scheduler.LambdaLR(optimizer, lr_lambda, last_epoch=-1)
+    }
+    return SCHEDULERS[args.scheduler]
+
+
+class Graph_Vars:
+    def __init__(self):
+        self.epoch = []
+        self.acc = []
+        self.loss = []
+        self.ncc_mismatch = []
+
+        self.nc1 = []
+
+        self.nc2_norm_h = []
+        self.nc2_norm_w = []
+        self.nc2_cos_h = []
+        self.nc2_cos_w = []
+        self.nc2_h = []
+        self.nc2_w =[]
+
+        self.norm_h = []
+        self.norm_w = []
+
+        self.nc3 = []
+        self.nc3_1 = []
+        self.nc3_2 = []
+
+        self.lr = []
+
+    def load_dt(self, nc_dt, epoch, lr=None):
+        self.epoch.append(epoch)
+        if lr:
+            self.lr.append(lr)
+        for key in nc_dt:
+            try:
+                self.__getattribute__(key).append(nc_dt[key])
+            except:
+                print('{} is not attribute of Graph var'.format(key))
+
+# =================== Logging utilities ===================
+
+def set_log_path(path):
+    global _log_path
+    _log_path = path
+
+
+def log(obj, filename='log.txt'):
+    print(obj)
+    if _log_path is not None:
+        with open(os.path.join(_log_path, filename), 'a') as f:
+            print(obj, file=f)
+
+
+def print_args(args):
+    s = "==========================================\n"
+    for arg, content in args.__dict__.items():
+        s += "{}:{}\n".format(arg, content)
+    s += "==========================================\n"
+    return s
+
 
 
 def get_mean_and_std(dataset):
