@@ -83,8 +83,6 @@ def analysis(model, loader, args):
     eigvec, eigval, _ = svds(Sb, k=args.num_classes - 1)
     inv_Sb = eigvec @ np.diag(eigval ** (-1)) @ eigvec.T
     nc1 = np.trace(Sw @ inv_Sb)
-    nc1_cls = [np.trace(Sw_cls1.cpu().numpy() @ inv_Sb) for Sw_cls1 in Sw_cls]
-    nc1_cls = np.array(nc1_cls)
 
     # ========== NC2.1 and NC2.2
     has_fc_cb = any(name == "fc_cb" for name, _ in model.named_modules())
@@ -125,9 +123,8 @@ def analysis(model, loader, args):
         "loss": loss,
         "acc": acc,
         "nc1": nc1,
-        "nc1_cls": nc1_cls,
-        "w_norm": W_norms.cpu().numpy(),
-        "h_norm": M_norms.cpu().numpy(),
+        #"w_norm": W_norms.cpu().numpy(),
+        #"h_norm": M_norms.cpu().numpy(),
         "w_mnorm": np.mean(W_norms.cpu().numpy()),
         "h_mnorm": np.mean(M_norms.cpu().numpy()),
         "nc21_h": norm_M_CoV,

@@ -36,14 +36,14 @@ def get_scheduler(args, optimizer):
     :return: scheduler
     """
 
-    lr_lambda = _get_polynomial_decay(args.lr, args.end_lr,
-                                      decay_epochs=args.decay_epochs,
-                                      from_epoch=0, power=args.power)
+    # lr_lambda = _get_polynomial_decay(args.lr, args.end_lr, decay_epochs=args.decay_epochs, from_epoch=0, power=args.power)
+    
     SCHEDULERS = {
-        'step': optim.lr_scheduler.StepLR(optimizer, step_size=args.max_epochs//10, gamma=args.lr_decay),
-        'multi_step': optim.lr_scheduler.MultiStepLR(optimizer, milestones=[150,350], gamma=0.1),
+        # 'step': optim.lr_scheduler.StepLR(optimizer, step_size=args.max_epochs//10, gamma=args.lr_decay),
+        'multi_step': optim.lr_scheduler.MultiStepLR(optimizer, milestones=[100,200,300], gamma=0.1),
+        'ms': optim.lr_scheduler.MultiStepLR(optimizer, milestones=[100,200,300], gamma=0.1),
         'cosine': optim.lr_scheduler.CosineAnnealingLR(optimizer, args.max_epochs),
-        'poly': optim.lr_scheduler.LambdaLR(optimizer, lr_lambda, last_epoch=-1)
+        # 'poly': optim.lr_scheduler.LambdaLR(optimizer, lr_lambda, last_epoch=-1)
     }
     return SCHEDULERS[args.scheduler]
 
@@ -53,23 +53,21 @@ class Graph_Vars:
         self.epoch = []
         self.acc = []
         self.loss = []
-        self.ncc_mismatch = []
 
         self.nc1 = []
 
-        self.nc2_norm_h = []
-        self.nc2_norm_w = []
-        self.nc2_cos_h = []
-        self.nc2_cos_w = []
+        self.nc21_h = []
+        self.nc21_w = []
+        self.nc22_h = []
+        self.nc22_w = []
         self.nc2_h = []
         self.nc2_w =[]
 
-        self.norm_h = []
-        self.norm_w = []
+        self.h_mnorm = []
+        self.w_mnorm = []
 
         self.nc3 = []
-        self.nc3_1 = []
-        self.nc3_2 = []
+        self.nc3_d = []
 
         self.lr = []
 

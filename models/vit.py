@@ -104,12 +104,10 @@ class ViT(nn.Module):
         self.pool = pool
         self.to_latent = nn.Identity()
 
-        self.mlp_head = nn.Sequential(
-            nn.LayerNorm(dim),
-            nn.Linear(dim, num_classes)
-        )
+        self.mlp_ln = nn.LayerNorm(dim)
+        self.fc = nn.Linear(dim, num_classes)
 
-    def forward(self, img):
+    def forward(self, img, ret='o'):
         x = self.to_patch_embedding(img)
         b, n, _ = x.shape
 
@@ -123,4 +121,9 @@ class ViT(nn.Module):
         x = x.mean(dim = 1) if self.pool == 'mean' else x[:, 0]
 
         x = self.to_latent(x)
-        return self.mlp_head(x)
+        feat = self.mlp_ln(x)
+        out = self.fc(feat)
+        if ret == 'of': 
+            return out, feat 
+        else: 
+            return out 

@@ -41,7 +41,6 @@ def evaluate(model, criterion, test_loader):
             loss = criterion(outputs, targets)
 
             test_loss += loss.item()
-            _, predicted = outputs.argmax(1)
             total += targets.size(0)
             correct += (outputs.argmax(1) == targets).sum().item()
     return test_loss/(batch_idx+1), correct/total

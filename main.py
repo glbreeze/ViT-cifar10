@@ -39,8 +39,8 @@ def main(args):
     os.environ["WANDB_CACHE_DIR"] = "./wandb"
     os.environ["WANDB_CONFIG_DIR"] = "./wandb"
     wandb.login(key='0c0abb4e8b5ce4ee1b1a4ef799edece5f15386ee')
-    wandb.init(project='nv' + args.dataset,
-               name=args.store_name.split('/')[-1]
+    wandb.init(project='nv' + args.dset,
+               name=args.exp_name
                )
     wandb.config.update(args)
 
@@ -55,36 +55,36 @@ def main(args):
     # ====================  define model ====================
     # Model factory..
     print('==> Building model..')
-    if args.net=='res18':
+    if args.model=='res18' or args.model=='resnet18':
         net = ResNet18()
-    elif args.net=='res50':
+    elif args.model=='res50' or args.model=='resnet50':
         net = ResNet50()
-    elif args.net=="convmixer":
+    elif args.model=="convmixer":
         # from paper, accuracy >96%. you can tune the depth and dim to scale accuracy and speed.
         net = ConvMixer(256, 16, kernel_size=args.convkernel, patch_size=1, n_classes=10)
-    elif args.net=="mlpmixer":
+    elif args.model=="mlpmixer":
         net = MLPMixer(image_size=32, channels=3, patch_size=args.patch, dim=512, depth=6, num_classes = args.num_classes)
-    elif args.net=="vit_small":
+    elif args.model=="vit_small":
         net = ViT(
             image_size=args.imsize, patch_size=args.patch,
             num_classes=args.num_classes, dim=int(args.dimhead),
             depth=6, heads=8, mlp_dim=512,
             dropout=0.1, emb_dropout=0.1
         )
-    elif args.net=="vit_tiny":
+    elif args.model=="vit_tiny":
         net = ViT(
             image_size=args.imsize, patch_size=args.patch,
             num_classes=args.num_classes, dim=int(args.dimhead),
             depth=4, heads=6, mlp_dim=256,
             dropout=0.1, emb_dropout=0.1
         )
-    elif args.net=="simplevit":
+    elif args.model=="simplevit":
         net = SimpleViT(
             image_size=args.imsize, patch_size=args.patch,
             num_classes=args.num_classes, dim=int(args.dimhead),
             depth=6, heads=8, mlp_dim=512
     )
-    elif args.net=="vit":
+    elif args.model=="vit":
         # ViT for cifar10
         net = ViT(
             image_size=args.imsize, patch_size=args.patch,
@@ -92,10 +92,10 @@ def main(args):
             depth=6, heads=8, mlp_dim=512,
             dropout=0.1, emb_dropout=0.1
     )
-    elif args.net=="vit_timm":
+    elif args.model=="vit_timm":
         net = timm.create_model("vit_base_patch16_384", pretrained=True)
         net.head = nn.Linear(net.head.in_features, 10)
-    elif args.net=="swin":
+    elif args.model=="swin":
         from models.swin import swin_t
         net = swin_t(window_size=args.patch, num_classes=10, downscaling_factors=(2,2,2,1))
     if torch.cuda.is_available():
@@ -121,12 +121,11 @@ def main(args):
 
     for epoch in range(args.max_epochs):
         train_loss, train_acc = train_one_epoch(net, criterion, optimizer, train_loader, args)
-        if args.scheduler in ['step', 'ms', 'multi_step', 'poly']:
-            lr_scheduler.step()
+        lr_scheduler.step()
 
         val_loss, val_acc = evaluate(net, criterion, test_loader)
 
-        wandb.watch(net)
+        wandb.watch(net, criterion, log='all', log_freq=50)
         wandb.log({'train/train_loss': train_loss,
                    'train/train_acc': train_acc,
                    'train/lr': optimizer.param_groups[0]["lr"],
@@ -140,7 +139,17 @@ def main(args):
             nc_val = analysis(net, test_loader, args)
             graphs1.load_dt(nc_train, epoch=epoch, lr=optimizer.param_groups[0]['lr'])
             graphs2.load_dt(nc_val, epoch=epoch, lr=optimizer.param_groups[0]['lr'])
-
+            
+            wandb.log({'nc/nc1': nc_train['nc1'],
+                       'nc/nc2_h': nc_train['nc2_h'],
+                       'nc/nc2_w': nc_train['nc2_w'],
+                       'nc/nc3': nc_train['nc3'],
+                       'nc/nc3_d': nc_train['nc3_d'],
+                       'nc/w_mnorm': nc_train['w_mnorm'],
+                       'nc/h_mnorm': nc_train['h_mnorm'],
+                   }, step=epoch
+                  )
+            
         # ===== save model
         if args.save_ckpt and val_acc > best_acc:
             state = {"model": net.state_dict(),
@@ -178,7 +187,7 @@ if __name__ == "__main__":
     parser.add_argument('--lr', default=0.01, type=float, help='learning rate')  # resnets.. 1e-3, Vit..1e-4
     parser.add_argument('--resume', '-r', default=False, action='store_true', help='resume from checkpoint')
     parser.add_argument('--use_amp', default=False, action='store_true', help='disable mixed precision training. for older pytorch versions')
-    parser.add_argument('--batch_size', default=128)
+    parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--scheduler', type=str, default='ms')
     parser.add_argument('--max_epochs', type=int, default='200')
 
@@ -196,8 +205,12 @@ if __name__ == "__main__":
     elif args.dset == 'cifar100':
         args.imsize = 32
         args.num_classes = 100
+    if 'resnet' in args.model:
+        args.lr = 0.01 
+    elif 'vit' in args.model: 
+        args.lr = 0.001
 
-    args.output_dir = os.path.join('./result/{}/{}/'.format(args.dset, args.model), args.exp_name)
+    args.output_dir = os.path.join('./result/{}_{}/'.format(args.dset, args.model), args.exp_name)
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)
     set_log_path(args.output_dir)
